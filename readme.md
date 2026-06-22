@@ -40,7 +40,9 @@ npm run target           # spawn demo target on --inspect=9229
 ## MCP client wiring (Claude Code)
 
 ```sh
-claude mcp add -s user inspectctl -- node your_path/inspectctl/src/index.ts
+claude mcp remove -s user inspectctl
+claude mcp add -s user inspectctl -- npx tsx your_path/inspectctl/src/index.ts
+claude --dangerously-skip-permissions
 ```
 
 Then in any Claude Code conversation:

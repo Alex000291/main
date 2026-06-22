@@ -99,6 +99,7 @@ server.tool(
     frame: z.number().int().optional().describe("0-based call-frame index (pauses target)"),
     returnByValue: z.boolean().optional(),
     timeoutMs: z.number().int().optional(),
+    sessionId: z.string().optional().describe("Reuse an existing session's CDP connection (from open_breakpoint_session). Required for frame eval while the session holds the paused state — avoids opening a second connection that would race/deadlock."),
   },
   async (args) => {
     try {

@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "inspectctl": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["src/index.ts"],
+      "cwd": "D:\\works\\web3\\inspectctl"
+    }
+  }
+}

@@ -76,12 +76,33 @@ export async function breakpoint(args: BreakpointArgs): Promise<BreakpointHit> {
   const timeoutMs = args.timeoutMs ?? 30_000;
   return withClient(args, async (client) => {
     const { Debugger } = client;
+
+    // Fix: skip --inspect-brk initial pause before setting our breakpoint.
+    // When Debugger.enable() is called on a paused target, CDP fires a
+    // Debugger.paused event immediately. We listen for it with a short
+    // timeout — if it fires, resume past the startup pause; otherwise proceed.
+    await Debugger.enable();
+
+    await new Promise<void>((resolve) => {
+      const onInitialPaused = async () => {
+        (Debugger as any).removeListener?.("paused", onInitialPaused);
+        clearTimeout(t);
+        await Debugger.resume().catch(() => {});
+        resolve();
+      };
+      const t = setTimeout(() => {
+        (Debugger as any).removeListener?.("paused", onInitialPaused);
+        resolve();
+      }, 500);
+      (Debugger as any).on("paused", onInitialPaused);
+    });
+
     await setBPAndArm(client, args);
 
     return new Promise<BreakpointHit>((resolve, reject) => {
       const timer = setTimeout(() => {
         try {
-          (client as any).removeListener?.("Debugger.paused", onPaused);
+          (Debugger as any).removeListener?.("paused", onPaused);
         } catch {}
         reject(new Error(`breakpoint never hit within ${timeoutMs}ms`));
       }, timeoutMs);
@@ -89,7 +110,7 @@ export async function breakpoint(args: BreakpointArgs): Promise<BreakpointHit> {
       const onPaused = async (params: any) => {
         clearTimeout(timer);
         try {
-          (client as any).removeListener?.("Debugger.paused", onPaused);
+          (Debugger as any).removeListener?.("paused", onPaused);
         } catch {}
         try {
           const frames = (params.callFrames || []).map((f: any) => ({
@@ -132,6 +153,22 @@ export async function openBreakpointSession(args: OpenBreakpointSessionArgs) {
     line: args.line,
   });
   const { client } = session;
+
+  // Fix: skip --inspect-brk initial pause before arming the breakpoint.
+  await client.Debugger.enable();
+  await new Promise<void>((resolve) => {
+    const onInitialPaused = async () => {
+      (client.Debugger as any).removeListener?.("paused", onInitialPaused);
+      clearTimeout(t);
+      await client.Debugger.resume().catch(() => {});
+      resolve();
+    };
+    const t = setTimeout(() => {
+      (client.Debugger as any).removeListener?.("paused", onInitialPaused);
+      resolve();
+    }, 500);
+    (client.Debugger as any).on("paused", onInitialPaused);
+  });
 
   await setBPAndArm(client as any, args as BreakpointArgs);
 
