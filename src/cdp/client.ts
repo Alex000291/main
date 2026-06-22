@@ -71,54 +71,6 @@ async function resolveTarget(
 }
 
 // ---------------------------------------------------------------------------
-// Connection pool for withClient — reuses idle CDP connections per target.
-// ---------------------------------------------------------------------------
-
-const POOL_MAX = 2;
-const POOL_TTL_MS = 60_000;
-
-const pool = new Map<string, CDP.Client[]>();
-const poolLastUsed = new Map<CDP.Client, number>();
-
-function acquireFromPool(wsUrl: string): CDP.Client | undefined {
-  const idle = pool.get(wsUrl);
-  if (!idle || idle.length === 0) return undefined;
-  const client = idle.pop()!;
-  poolLastUsed.delete(client);
-  return client;
-}
-
-function releaseToPool(wsUrl: string, client: CDP.Client) {
-  const idle = pool.get(wsUrl) ?? [];
-  if (idle.length >= POOL_MAX) {
-    // Evict oldest to stay within cap.
-    const evicted = idle.shift()!;
-    poolLastUsed.delete(evicted);
-    evicted.close().catch(() => {});
-  }
-  idle.push(client);
-  poolLastUsed.set(client, Date.now());
-  pool.set(wsUrl, idle);
-}
-
-// TTL eviction — runs every 30s, cleans up connections idle longer than 60s.
-setInterval(() => {
-  const now = Date.now();
-  for (const [wsUrl, clients] of pool.entries()) {
-    const fresh = clients.filter((c) => {
-      if (now - (poolLastUsed.get(c) ?? 0) > POOL_TTL_MS) {
-        c.close().catch(() => {});
-        poolLastUsed.delete(c);
-        return false;
-      }
-      return true;
-    });
-    if (fresh.length === 0) pool.delete(wsUrl);
-    else pool.set(wsUrl, fresh);
-  }
-}, 30_000).unref();
-
-// ---------------------------------------------------------------------------
 
 /**
  * Open a CDP client to the selected target. Caller MUST close it.
@@ -132,9 +84,8 @@ export async function connect(sel: TargetSelector = {}): Promise<CDP.Client> {
 }
 
 /**
- * Run an action against a pooled CDP client and return it afterwards.
- * On error the connection is closed (not returned to pool) and the error
- * message is prefixed with the target label for easier diagnosis.
+ * Run an action against a fresh CDP client and close it afterwards.
+ * On error the error message is prefixed with the target label for easier diagnosis.
  */
 export async function withClient<T>(
   sel: TargetSelector,
@@ -143,24 +94,17 @@ export async function withClient<T>(
   const port = sel.port ?? DEFAULT_PORT;
   const host = sel.host ?? DEFAULT_HOST;
   const { wsUrl, label } = await resolveTarget(sel);
-
-  let client = acquireFromPool(wsUrl);
-  if (!client) {
-    client = await CDP({ host, port, target: wsUrl });
-  }
-
-  let errored = false;
+  const client = await CDP({ host, port, target: wsUrl });
   try {
     return await fn(client);
   } catch (e: any) {
-    errored = true;
     const msg = e instanceof Error ? e.message : String(e);
     throw new Error(`[${label}] ${msg}`);
   } finally {
-    if (errored) {
-      client.close().catch(() => {});
-    } else {
-      releaseToPool(wsUrl, client);
+    try {
+      await client.close();
+    } catch {
+      // ignore
     }
   }
 }
