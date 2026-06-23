@@ -42,7 +42,6 @@ npm run target           # spawn demo target on --inspect=9229
 ```sh
 claude mcp remove -s user inspectctl
 claude mcp add -s user inspectctl -- npx tsx your_path/inspectctl/src/index.ts
-claude --dangerously-skip-permissions
 ```
 
 Then in any Claude Code conversation:
