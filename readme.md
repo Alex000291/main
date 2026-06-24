@@ -112,7 +112,7 @@ Stop pasting `console.log` and tracebacks into your agent. Let it look.
 
 ## Requirements
 
-Node.js 22.6+ (native TypeScript stripping — no build step needed). Tested on Node 24.
+Node.js 22.6+ with `--experimental-strip-types` (native TypeScript stripping — no build step needed). Tested on Node 24.
 
 ## Install
 
@@ -127,7 +127,8 @@ npm install
 ### Claude Code (recommended)
 
 ```sh
-claude mcp add -s user inspectctl -- node /your_path/inspectctl/src/index.ts
+claude mcp remove -s user inspectctl
+claude mcp add -s user inspectctl -- node --experimental-strip-types /your_path/inspectctl/src/index.ts
 ```
 
 Or add to your project's `.mcp.json`:
@@ -138,7 +139,7 @@ Or add to your project's `.mcp.json`:
     "inspectctl": {
       "type": "stdio",
       "command": "node",
-      "args": ["src/index.ts"],
+      "args": ["--experimental-strip-types", "src/index.ts"],
       "cwd": "/your_path/inspectctl"
     }
   }

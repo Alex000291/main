@@ -32,8 +32,10 @@ export class DAPClient extends EventEmitter {
   >();
   private buf = Buffer.alloc(0);
 
-  constructor(private socket: Socket) {
+  private socket: Socket;
+  constructor(socket: Socket) {
     super();
+    this.socket = socket;
     socket.on("data", (chunk) => this._onData(chunk));
     socket.on("error", (e) => {
       process.stderr.write(`DAP socket error: ${e.message}\n`);

@@ -3,7 +3,7 @@
     "inspectctl": {
       "type": "stdio",
       "command": "node",
-      "args": ["src/index.ts"],
+      "args": ["--experimental-strip-types", "src/index.ts"],
       "cwd": "D:\\works\\web3\\inspectctl"
     }
   }
