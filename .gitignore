@@ -4,3 +4,4 @@ node_modules/
 .env
 .letta/
 example/1.mjs
+example/1.py
